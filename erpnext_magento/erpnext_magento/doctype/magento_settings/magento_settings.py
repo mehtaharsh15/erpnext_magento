@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
-
 from __future__ import unicode_literals
 import frappe
-from frappe import _
 import requests.exceptions
+
+from frappe import _
 from frappe.model.document import Document
 from erpnext_magento.erpnext_magento.magento_requests import get_request
 from erpnext_magento.erpnext_magento.exceptions import MagentoSetupError

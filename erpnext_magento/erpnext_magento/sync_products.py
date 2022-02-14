@@ -1,11 +1,10 @@
 from __future__ import unicode_literals
+
 import frappe
-from frappe import _
-import requests.exceptions
+
+from frappe import _, throw
 from erpnext_magento.erpnext_magento.exceptions import MagentoError
-from erpnext_magento.erpnext_magento.utils import make_magento_log, disable_magento_sync_for_item
-from erpnext.stock.utils import get_bin
-from frappe.utils import cstr, flt, cint, get_files_path
+from erpnext_magento.erpnext_magento.utils import make_magento_log
 from erpnext_magento.erpnext_magento.magento_requests import (
 	get_magento_category_id_by_name,
 	get_magento_category_name_by_id,
@@ -21,7 +20,7 @@ from erpnext_magento.erpnext_magento.magento_requests import (
 	get_magento_store_code_by_website_id,
 	post_request,
 	put_request)
-import base64, datetime, requests, os
+
 
 def sync_products():
 	sync_item_attributes()
@@ -33,6 +32,7 @@ def sync_products():
 	erpnext_item_list = []
 	sync_erpnext_items(erpnext_item_list, magento_item_list)
 	frappe.local.form_dict.count_dict["magento_products"] = len(erpnext_item_list)
+
 
 def sync_item_attributes():
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
@@ -50,6 +50,7 @@ def sync_item_attributes():
 
 		sync_magento_item_attribute_values(erpnext_item_attribute, magento_item_attribute)
 		sync_erpnext_item_attribute_values(erpnext_item_attribute, magento_item_attribute)
+
 
 def sync_magento_item_attribute_values(erpnext_item_attribute, magento_item_attribute):
 	for magento_item_attribute_value in magento_item_attribute.get("options"):
@@ -82,6 +83,7 @@ def sync_magento_item_attribute_values(erpnext_item_attribute, magento_item_attr
 			erpnext_item_attribute_value.insert()
 		
 		frappe.db.commit()	
+
 
 def sync_erpnext_item_attribute_values(erpnext_item_attribute, magento_item_attribute):
 	magento_item_attribute_value_list = []
@@ -117,6 +119,7 @@ def sync_erpnext_item_attribute_values(erpnext_item_attribute, magento_item_attr
 	}
 
 	put_request(f'products/attributes/{erpnext_item_attribute.magento_item_attribute_id}', {"attribute": magento_item_attribute_dict})
+
 
 def sync_magento_items(magento_item_list):
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
@@ -167,11 +170,13 @@ def sync_magento_items(magento_item_list):
 
 			update_erpnext_item(item_dict, magento_item, magento_item_list)
 
+
 def convert_magento_status_to_text(magento_status):
 	if magento_status == 1:
 		return "Enabled"
 	
 	return "Disabled"
+
 
 def convert_website_ids_list(website_ids_list):
 	website_list = []
@@ -184,6 +189,7 @@ def convert_website_ids_list(website_ids_list):
 
 	return
 
+
 def convert_catergory_ids_list(category_ids_list):
 	category_list = []
 	
@@ -194,6 +200,7 @@ def convert_catergory_ids_list(category_ids_list):
 		return category_list
 	
 	return
+
 
 def create_erpnext_item(item_dict, magento_item, magento_item_list):
 	try:
@@ -212,6 +219,7 @@ def create_erpnext_item(item_dict, magento_item, magento_item_list):
 		else:
 			make_magento_log(title=e.message, status="Error", method="create_erpnext_item", message=frappe.get_traceback(),
 				request_data=item_dict, exception=True)
+
 
 def sync_magento_item_prices(erpnext_item_code, magento_item):
 	for website_id in magento_item.get("extension_attributes").get("website_ids"):
@@ -233,6 +241,7 @@ def sync_magento_item_prices(erpnext_item_code, magento_item):
 				"price_list_rate": magento_item_price
 			}).insert()
 
+
 def get_price_list_by_website_id(website_id):
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
 
@@ -242,6 +251,7 @@ def get_price_list_by_website_id(website_id):
 	
 	raise Exception(f"There is no maching website in ERPNext Magento settings for the Magento website {get_magento_website_name_by_id(website_id)}.")
 
+
 def get_magento_configurable_item_attributes_list(magento_item):
 	attribute_list = []
 
@@ -250,6 +260,7 @@ def get_magento_configurable_item_attributes_list(magento_item):
 		attribute_list.append({"attribute": magento_item_attribute_details.get("default_frontend_label")})
 
 	return attribute_list
+
 
 def get_magento_variant_item_attributes_list(erpnext_template_item, magento_item):
 	attribute_list = []
@@ -269,8 +280,8 @@ def get_magento_variant_item_attributes_list(erpnext_template_item, magento_item
 		
 		attribute_list.append(magento_item_attribute_value_dict)
 			
-
 	return attribute_list
+
 
 def update_erpnext_item(item_dict, magento_item, magento_item_list):
 	try:
@@ -297,14 +308,14 @@ def update_erpnext_item(item_dict, magento_item, magento_item_list):
 
 		magento_item_list.append(magento_item.get("id"))
 		frappe.db.commit()
-		
-			
+					
 	except Exception as e:
 		if e.args[0] and e.args[0].startswith("402"):
 			raise e
 		else:
 			make_magento_log(title=e.message, status="Error", method="update_erpnext_item", message=frappe.get_traceback(),
-				request_data=magento_customer, exception=True)
+				request_data=item_dict, exception=True)
+
 
 def sync_erpnext_items(erpnext_item_list, magento_item_list):
 	for erpnext_item in get_erpnext_items():
@@ -313,10 +324,12 @@ def sync_erpnext_items(erpnext_item_list, magento_item_list):
 				update_item_to_magento(erpnext_item)
 				erpnext_item_list.append(erpnext_item.name)
 
-			elif erpnext_item.changed == 'price' and erpnext_item.name not in erpnext_item_list:
+			elif erpnext_item.changed == 'price':
+			#elif erpnext_item.changed == 'price' and erpnext_item.name not in erpnext_item_list:
 				if not erpnext_item.get("has_variants"):
 					update_item_prices_to_magento(erpnext_item)
 					erpnext_item_list.append(erpnext_item.name)
+	
 
 def get_erpnext_items():
 	erpnext_items = []
@@ -345,6 +358,7 @@ def get_erpnext_items():
 	updated_price_item_list = frappe.db.sql(item_from_item_price_sql, as_dict=1)
 
 	return erpnext_items + updated_price_item_list
+
 
 def update_item_to_magento(erpnext_item):
 	magento_item_dict = {
@@ -386,7 +400,7 @@ def update_item_to_magento(erpnext_item):
 			"type_id": "simple",
 			"price": get_magento_default_item_price(erpnext_item)
 		})
-
+	
 	try:
 		if not erpnext_item.get("magento_product_id"):
 			del magento_item_dict["id"]
@@ -401,7 +415,7 @@ def update_item_to_magento(erpnext_item):
 
 		else:
 			post_request("rest/all/V1/products", {"product": magento_item_dict})
-
+			
 			erpnext_item["magento_sku"] = magento_item_dict.get("sku")
 
 			if not erpnext_item.get("has_variants"):
@@ -437,6 +451,7 @@ def get_magento_default_item_price(erpnext_item):
 		make_magento_log(title="Missing Price in Default Price List", status="Error", method="sync_magento_items", message=frappe.get_traceback(),
 			request_data=erpnext_item, exception=True)	
 
+
 def get_magento_website_ids_list(erpnext_item):
 	magento_website_ids_list = []
 
@@ -449,6 +464,7 @@ def get_magento_website_ids_list(erpnext_item):
 		magento_website_ids_list.append(get_magento_website_id_by_name(magento_website.get("magento_website_name")))
 
 	return magento_website_ids_list
+
 
 def get_magento_category_ids_list(erpnext_item):
 	magento_category_ids_list = []
@@ -463,6 +479,7 @@ def get_magento_category_ids_list(erpnext_item):
 			"category_id": get_magento_category_id_by_name(magento_category.get("magento_category_name"))})
 
 	return magento_category_ids_list
+
 
 def get_magento_configurable_product_options(erpnext_item):
 	configurable_product_options_list = []
@@ -483,6 +500,7 @@ def get_magento_configurable_product_options(erpnext_item):
 		
 	return configurable_product_options_list
 
+
 def get_magento_configurable_product_options_values(erpnext_item, magento_attribute_details):
 	values_list = []
 	erpnext_item_attribute_values = frappe.db.get_all("Item Variant Attribute", filters={"variant_of": erpnext_item.get("name")},
@@ -494,6 +512,7 @@ def get_magento_configurable_product_options_values(erpnext_item, magento_attrib
 
 	return values_list
 
+
 def get_magento_configurable_product_variant_links(erpnext_item):
 	variant_links_list = []
 
@@ -501,6 +520,7 @@ def get_magento_configurable_product_variant_links(erpnext_item):
 		variant_links_list.append(variant_link.get("magento_product_id"))
 
 	return variant_links_list
+
 
 def get_magento_variant_product_attributes(erpnext_item):
 	attribute_list = []
@@ -518,6 +538,7 @@ def get_magento_variant_product_attributes(erpnext_item):
 
 	return attribute_list
 
+
 def save_new_magento_properties_to_erpnext(item_name, request_response):
 	erpnext_item = frappe.get_doc("Item", item_name)
 
@@ -525,6 +546,7 @@ def save_new_magento_properties_to_erpnext(item_name, request_response):
 	erpnext_item.magento_sku = request_response.get("sku")
 	erpnext_item.save()
 	frappe.db.commit()
+
 
 def update_item_prices_to_magento(erpnext_item):
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
@@ -538,17 +560,18 @@ def update_item_prices_to_magento(erpnext_item):
 		price = frappe.db.get_value("Item Price", {"item_code": erpnext_item.get("item_code"),
 			"price_list": erpnext_price_list}, "price_list_rate")
 
-		try:	
-			if price:
-				put_request(f'rest/{store_code}/V1/products/{erpnext_item.get("magento_sku")}', {"product": {"price": price}}) 
-			
-			else:
-				raise Exception(f'Item "{erpnext_item.get("item_name")}" has no price in price list \
+		if price:
+			try:	
+				put_request(f'rest/{store_code}/V1/products/{erpnext_item.get("magento_sku")}', {"product": {"price": price}})
+
+			except Exception as e:
+				make_magento_log(title=e.message, status="Error", method="sync_magento_items", message=frappe.get_traceback(),
+								request_data=erpnext_item.get("item_code"), exception=True)
+
+		else:
+			raise Exception(f'Item "{erpnext_item.get("item_name")}" has no price in price list \
 	"{erpnext_price_list}" which is associated with Magento Website "{erpnext_item_magento_website.get("magento_website_name")}" in Magento Settings.')
 
-		except Exception as e:
-			make_magento_log(title=e.message, status="Error", method="sync_magento_items", message=frappe.get_traceback(),
-							request_data=erpnext_item, exception=True)
 
 def get_price_list_for_magento_website(magento_website_name):
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
