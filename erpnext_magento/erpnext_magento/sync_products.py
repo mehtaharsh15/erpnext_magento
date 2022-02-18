@@ -413,6 +413,11 @@ def update_item_to_magento(erpnext_item):
 			if not erpnext_item.get("has_variants"):
 				update_item_prices_to_magento(erpnext_item)
 
+			# Update Parent Item
+			if erpnext_item.get("variant_of"):
+				update_item_to_magento(frappe.get_doc("Item", erpnext_item.get("variant_of")))
+
+
 		else:
 			post_request("rest/all/V1/products", {"product": magento_item_dict})
 			
@@ -442,14 +447,14 @@ def convert_magento_status_to_boolean(magento_status):
 def get_magento_default_item_price(erpnext_item):
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
 
-	try:
-		return frappe.db.get_value("Item Price", {"item_code": erpnext_item.get("item_code"),
+	item_price = frappe.db.get_value("Item Price", {"item_code": erpnext_item.get("item_code"),
 			"price_list": magento_settings.default_price_list}, "price_list_rate")
 
-	except Exception as e:
-		error_message = f'Item "{erpnext_item.get("item_name")}" has no price in Magento Settings default price list "{magento_settings.default_price_list}".'
-		make_magento_log(title="Missing Price in Default Price List", status="Error", method="sync_magento_items", message=frappe.get_traceback(),
-			request_data=erpnext_item, exception=True)	
+	if item_price:
+		return item_price
+	
+	else:
+		frappe.throw(f'Item "{erpnext_item.get("item_name")}" has no price in Magento Settings default price list "{magento_settings.default_price_list}".')
 
 
 def get_magento_website_ids_list(erpnext_item):
@@ -506,9 +511,12 @@ def get_magento_configurable_product_options_values(erpnext_item, magento_attrib
 	erpnext_item_attribute_values = frappe.db.get_all("Item Variant Attribute", filters={"variant_of": erpnext_item.get("name")},
 		fields=["attribute", "attribute_value"])
 
+	added_list = []
 	for erpnext_item_attribute_value in erpnext_item_attribute_values:
-		values_list.append({"value_index": frappe.db.get_value("Item Attribute Value",
-			{"attribute_value": erpnext_item_attribute_value.get("attribute_value")}, "magento_item_attribute_value_id")})			
+		if erpnext_item_attribute_value not in added_list:
+			values_list.append({"value_index": frappe.db.get_value("Item Attribute Value",
+				{"attribute_value": erpnext_item_attribute_value.get("attribute_value")}, "magento_item_attribute_value_id")})			
+			added_list.append(erpnext_item_attribute_value)
 
 	return values_list
 
