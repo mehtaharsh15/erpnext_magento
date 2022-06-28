@@ -121,10 +121,10 @@ def sync_erpnext_item_attribute_values(erpnext_item_attribute, magento_item_attr
 	put_request(f'products/attributes/{erpnext_item_attribute.magento_item_attribute_id}', {"attribute": magento_item_attribute_dict})
 
 
-def sync_magento_items(magento_item_list):
+def sync_magento_items(magento_item_list, ignore_filter_conditions=False):
 	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
 
-	for magento_item in get_magento_items():
+	for magento_item in get_magento_items(ignore_filter_conditions):
 		item_dict = {
 			"doctype": "Item",
 			"magento_product_id": magento_item.get("id"),
@@ -135,6 +135,7 @@ def sync_magento_items(magento_item_list):
 			"item_code": magento_item.get("name"),
 			"item_group": magento_settings.item_group,
 			"stock_uom": _("Nos"),
+			"image": get_magento_item_image_url(magento_settings.magento_url, magento_item),
 			"magento_sku": magento_item.get("sku"),
 			"magento_attribute_set_name": get_magento_item_attribute_set_name_by_id(magento_item.get("attribute_set_id")),
 			"magento_websites": convert_website_ids_list(magento_item.get("extension_attributes").get("website_ids")),
@@ -176,6 +177,14 @@ def convert_magento_status_to_text(magento_status):
 		return "Enabled"
 	
 	return "Disabled"
+
+
+def get_magento_item_image_url(magento_url, magento_item):
+	image_url = ""
+	for image in magento_item.get("media_gallery_entries"): 
+		if "image" in image.get("types"):
+			image_url = f'{magento_url}/media/catalog/product{image.get("file")}'
+	return image_url
 
 
 def convert_website_ids_list(website_ids_list):
@@ -589,3 +598,22 @@ def get_price_list_for_magento_website(magento_website_name):
 			return website.get("price_list")
 	
 	raise Exception(f'Website "{magento_website_name}" is not asociated with a price list in Magento settings.')
+
+
+# Manually sync all items from Magento to ERPNext
+# bench execute erpnext_magento.erpnext_magento.sync_products.sync_all_magento_items_to_erpnext
+def sync_all_magento_items_to_erpnext():
+	# sync_magento_items(magento_item_list = [], ignore_filter_conditions=True)
+
+	magento_settings = frappe.get_doc("Magento Settings", "Magento Settings")
+
+	for magento_item in get_magento_items(ignore_filter_conditions=True):
+		image_url = get_magento_item_image_url(magento_settings.magento_url, magento_item)
+		erpnext_item = frappe.get_doc("Item", frappe.db.get_value("Item", {"magento_product_id": magento_item.get("id")}, "name"))
+
+		print(f'{frappe.db.get_value("Item", {"magento_product_id": magento_item.get("id")}, "name")}, {magento_item.get("id")}, {image_url}')
+		if image_url and erpnext_item:
+			erpnext_item.update({"image": get_magento_item_image_url(magento_settings.magento_url, magento_item)})
+			erpnext_item.flags.ignore_mandatory = True
+			erpnext_item.save()
+			frappe.db.commit()

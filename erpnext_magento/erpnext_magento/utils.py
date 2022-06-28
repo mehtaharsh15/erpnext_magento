@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
+from xml.etree.ElementTree import TreeBuilder
 import frappe
 from frappe import throw, _
 import json
 from erpnext_magento.erpnext_magento.exceptions import MagentoSetupError
+
 
 def disable_magento_sync_for_item(item, rollback=False):
 	"""Disable Item if not exist on magento"""
@@ -16,10 +18,12 @@ def disable_magento_sync_for_item(item, rollback=False):
 	item.save(ignore_permissions=True)
 	frappe.db.commit()
 
+
 def disable_magento_sync_on_exception():
 	frappe.db.rollback()
 	frappe.db.set_value("Magento Settings", None, "enable_magento", 0)
 	frappe.db.commit()
+
 
 def is_magento_enabled():
 	magento_settings = frappe.get_doc("Magento Settings")
@@ -31,7 +35,8 @@ def is_magento_enabled():
 		return False
 	
 	return True
-	
+
+
 def make_magento_log(title="Sync Log", status="Queued", method="sync_magento", message=None, exception=False, 
 name=None, request_data={}):
 	if not name:
@@ -57,6 +62,7 @@ name=None, request_data={}):
 		
 		log.save(ignore_permissions=True)
 		frappe.db.commit()
+
 
 def fix_missing_variant_of_in_item_variant_attribute():
     to_fix_item_attribute_values_sql = """select name from `tabItem Variant Attribute`
